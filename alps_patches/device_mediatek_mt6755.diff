@@ -1,0 +1,46 @@
+From f1115f742ea531ced27baaf1cee5f0740eab3559 Mon Sep 17 00:00:00 2001
+From: Ting.Sung <Ting.Sung@tpv-tech.com>
+Date: Mon, 11 Dec 2017 15:21:47 +0800
+Subject: [PATCH] [Porting] feature of private folder
+
+http://twtps524.tpvaoc.com:1001/#/q/branch:X828_N0_V2+owner:Ting.Sung+message:private+project:MT6755S/alps/device
+
+Change-Id: I4d32ed453656dbd0e02b1e69db8a8c55b783decd
+Signed-off-by: Ting.Sung <Ting.Sung@tpv-tech.com>
+---
+
+diff --git a/factory_init.rc b/factory_init.rc
+index dc42eb1..48d0b4c 100644
+--- a/factory_init.rc
++++ b/factory_init.rc
+@@ -288,6 +288,7 @@
+ 
+     # Emulated internal storage area
+     mkdir /data/media 0770 media_rw media_rw
++    mkdir /data/media_private 0770 media_rw media_rw
+ 
+     # Make sure we have the device encryption key
+     start vold
+diff --git a/meta_init.rc b/meta_init.rc
+index 464b9a5..c2f3c46 100644
+--- a/meta_init.rc
++++ b/meta_init.rc
+@@ -377,6 +377,7 @@
+     symlink /data/data /data/user/0
+ 
+     mkdir /data/media 0770 media_rw media_rw
++    mkdir /data/media_private 0770 media_rw media_rw
+     mkdir /data/media/obb 0770 media_rw media_rw
+ 
+     mkdir /data/cache 0770 system cache
+diff --git a/sepolicy/basic/file_contexts b/sepolicy/basic/file_contexts
+index 85b4273..10ced2d 100644
+--- a/sepolicy/basic/file_contexts
++++ b/sepolicy/basic/file_contexts
+@@ -34,3 +34,6 @@
+ /dev/block/platform/mtk-msdc\.0/[0-9]+\.msdc0/by-name/md3img(_[ab])?	u:object_r:md_block_device:s0
+ /dev/block/platform/mtk-msdc\.0/[0-9]+\.msdc0/by-name/odmdtbo(_[ab])?	u:object_r:dtbo_block_device:s0
+ /dev/block/platform/mtk-msdc\.0/[0-9]+\.msdc0/by-name/odm(_[ab])?	u:object_r:odm_block_device:s0
++
++# private folder
++/data/media_private(/.*)? u:object_r:media_rw_data_file:s0

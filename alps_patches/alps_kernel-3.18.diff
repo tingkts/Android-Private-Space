@@ -1,0 +1,113 @@
+From 42193d83c75f41fd8421f5fe8478e3377924452d Mon Sep 17 00:00:00 2001
+From: Ting.Sung <Ting.Sung@tpv-tech.com>
+Date: Mon, 11 Dec 2017 11:17:52 +0800
+Subject: [PATCH] [Porting] feature of private folder
+
+http://twtps524.tpvaoc.com:1001/#/q/project:MT6755S/alps/kernel-3.18+branch:X828_N0_V2+owner:Ting.Sung+status:merged
+
+Change-Id: I5f81522298761412cad0c159cd653dd8ab8390f5
+Signed-off-by: Ting.Sung <Ting.Sung@tpv-tech.com>
+---
+
+diff --git a/fs/sdcardfs/derived_perm.c b/fs/sdcardfs/derived_perm.c
+index d567edd..44bec73c 100644
+--- a/fs/sdcardfs/derived_perm.c
++++ b/fs/sdcardfs/derived_perm.c
+@@ -20,6 +20,8 @@
+ 
+ #include "sdcardfs.h"
+ 
++static const char* EMULATED_PRIVATE_VOLUME_ID_LABEL = "media_private";
++
+ /* copy derived state from parent inode */
+ static void inherit_derived_state(struct inode *parent, struct inode *child)
+ {
+@@ -57,6 +59,8 @@
+ void get_derived_permission_new(struct dentry *parent, struct dentry *dentry,
+ 				const struct qstr *name)
+ {
++    struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
++
+ 	struct sdcardfs_inode_info *info = SDCARDFS_I(dentry->d_inode);
+ 	struct sdcardfs_inode_data *parent_data =
+ 			SDCARDFS_I(parent->d_inode)->data;
+@@ -85,6 +89,10 @@
+ 	/* Derive custom permissions based on parent and current node */
+ 	switch (parent_data->perm) {
+ 	case PERM_INHERIT:
++        if (parent_data->private_folder == PRIVATE_FOLDER_IDENTIFIER) {
++            info->data->private_folder = PRIVATE_FOLDER_IDENTIFIER;
++        }
++        break;
+ 	case PERM_ANDROID_PACKAGE_CACHE:
+ 		/* Already inherited above */
+ 		break;
+@@ -97,6 +105,9 @@
+ 		else
+ 			info->data->userid = user_num;
+ 		set_top(info, info->data);
++        if (sbi->obbpath_s && strstr(sbi->obbpath_s, EMULATED_PRIVATE_VOLUME_ID_LABEL)) {
++            info->data->private_folder = PRIVATE_FOLDER_ROOT_IDENTIFIER;
++        }
+ 		break;
+ 	case PERM_ROOT:
+ 		/* Assume masked off by default. */
+@@ -133,6 +144,11 @@
+ 			info->data->d_uid =
+ 				multiuser_get_uid(parent_data->userid, appid);
+ 		set_top(info, info->data);
++        if (parent_data->perm == PERM_ANDROID_DATA) {
++            if (sbi->obbpath_s && strstr(sbi->obbpath_s, EMULATED_PRIVATE_VOLUME_ID_LABEL)) {
++                info->data->private_folder = PRIVATE_FOLDER_IDENTIFIER;
++            }
++        }
+ 		break;
+ 	case PERM_ANDROID_PACKAGE:
+ 		if (qstr_case_eq(name, &q_cache)) {
+diff --git a/fs/sdcardfs/sdcardfs.h b/fs/sdcardfs/sdcardfs.h
+index 8f2725c..085792a 100644
+--- a/fs/sdcardfs/sdcardfs.h
++++ b/fs/sdcardfs/sdcardfs.h
+@@ -73,6 +73,8 @@
+ 
+ #define AID_PACKAGE_INFO  1027
+ 
++#define PRIVATE_FOLDER_IDENTIFIER 20170728
++#define PRIVATE_FOLDER_ROOT_IDENTIFIER 20170906
+ 
+ /*
+  * Permissions are handled by our permission function.
+@@ -192,6 +194,8 @@
+ 	bool under_android;
+ 	bool under_cache;
+ 	bool under_obb;
++
++    unsigned int private_folder;
+ };
+ 
+ /* sdcardfs inode data in memory */
+@@ -414,8 +418,13 @@
+ static inline int get_gid(struct vfsmount *mnt,
+ 		struct sdcardfs_inode_data *data)
+ {
+-	struct sdcardfs_vfsmount_options *opts = mnt->data;
++    struct sdcardfs_vfsmount_options *opts = NULL;
+ 
++    if (data->private_folder == PRIVATE_FOLDER_IDENTIFIER) {
++        return data->d_uid;
++    }
++
++    opts = mnt->data;
+ 	if (opts->gid == AID_SDCARD_RW)
+ 		/* As an optimization, certain trusted system components only run
+ 		 * as owner but operate across all users. Since we're now handing
+@@ -455,6 +464,9 @@
+ 	}
+ 	owner_mode = info->lower_inode->i_mode & 0700;
+ 	filtered_mode = visible_mode & (owner_mode | (owner_mode >> 3) | (owner_mode >> 6));
++    if (data->private_folder == PRIVATE_FOLDER_ROOT_IDENTIFIER) {
++        return 0711;
++    }
+ 	return filtered_mode;
+ }
+ 

@@ -1,0 +1,69 @@
+From c301be1c0b6408cf268bc02c47500963e2087bc8 Mon Sep 17 00:00:00 2001
+From: Ting.Sung <Ting.Sung@tpv-tech.com>
+Date: Mon, 11 Dec 2017 13:58:00 +0800
+Subject: [PATCH] [Porting] feature of private folder
+
+http://twtps524.tpvaoc.com:1001/#/q/project:MT6755S/alps/system+branch:X828_N0_V2+owner:%22Ting.Sung+%253CTing.Sung%2540tpv-tech.com%253E%22
+
+Change-Id: I96f039b652154caea17f055d76a1384913fc604d
+Signed-off-by: Ting.Sung <Ting.Sung@tpv-tech.com>
+---
+
+diff --git a/rootdir/init.rc b/rootdir/init.rc
+index 21999d7..da90ffb 100644
+--- a/rootdir/init.rc
++++ b/rootdir/init.rc
+@@ -482,6 +482,7 @@
+     symlink /data/data /data/user/0
+ 
+     mkdir /data/media 0770 media_rw media_rw
++    mkdir /data/media_private 0770 media_rw media_rw
+     mkdir /data/media/obb 0770 media_rw media_rw
+ 
+     mkdir /data/cache 0770 system cache
+diff --git a/sdcard/sdcard.cpp b/sdcard/sdcard.cpp
+index 7d805bc..1f28bc8 100644
+--- a/sdcard/sdcard.cpp
++++ b/sdcard/sdcard.cpp
+@@ -80,9 +80,12 @@
+ 
+ #define PROP_SDCARDFS_DEVICE "ro.sys.sdcardfs"
+ #define PROP_SDCARDFS_USER "persist.sys.sdcardfs"
++#define PROP_ENABLE_PRIVATE_FOLDER "ro.sys.enable_private_folder"
+ 
+ /* Supplementary groups to execute with. */
+ static const gid_t kGroups[1] = { AID_PACKAGE_INFO };
++
++static const char* EMULATED_PRIVATE_VOLUME_ID_LABEL = "emulated_private";
+ 
+ static bool package_parse_callback(pkg_info *info, void *userdata) {
+     struct fuse_global *global = (struct fuse_global *)userdata;
+@@ -439,6 +442,16 @@
+     return 1;
+ }
+ 
++static bool should_enable_private_folder(void) {
++    if (property_get_bool(PROP_ENABLE_PRIVATE_FOLDER, false)) {
++        LOG(WARNING) << "Device explicitly enabled private folder";
++        return true;
++    } else {
++        LOG(WARNING) << "Device explicitly disabled private folder";
++    }
++    return false;
++}
++
+ int main(int argc, char **argv) {
+     const char *source_path = NULL;
+     const char *label = NULL;
+@@ -515,6 +528,11 @@
+     }
+     }
+ 
++    if (!should_enable_private_folder() && strcmp(label, EMULATED_PRIVATE_VOLUME_ID_LABEL) == 0){
++        LOG(WARNING) << "Device explicitly disabled " << label;
++        return 1;
++    }
++
+     if (should_use_sdcardfs()) {
+         run_sdcardfs(source_path, label, uid, gid, userid, multi_user, full_write);
+     } else {

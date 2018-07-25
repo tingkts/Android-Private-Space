@@ -1,0 +1,224 @@
+From 9f9bb1a5936831ab7c18b3faa83cbff701e733af Mon Sep 17 00:00:00 2001
+From: Ting.Sung <Ting.Sung@tpv-tech.com>
+Date: Mon, 11 Dec 2017 13:59:08 +0800
+Subject: [PATCH] [Porting] feature of private folder
+
+http://twtps524.tpvaoc.com:1001/#/q/project:MT6755S/alps/system+branch:X828_N0_V2+owner:%22Ting.Sung+%253CTing.Sung%2540tpv-tech.com%253E%22
+
+Change-Id: I524973fe3fb25a1777013c348bff517fd945dd4d
+Signed-off-by: Ting.Sung <Ting.Sung@tpv-tech.com>
+---
+
+diff --git a/EmulatedVolume.cpp b/EmulatedVolume.cpp
+index abfda52..4821718 100644
+--- a/EmulatedVolume.cpp
++++ b/EmulatedVolume.cpp
+@@ -29,6 +29,7 @@
+ #include <sys/types.h>
+ #include <sys/wait.h>
+ 
++#include <cutils/properties.h>
+ using android::base::StringPrintf;
+ 
+ namespace android {
+@@ -36,20 +37,34 @@
+ 
+ static const char* kFusePath = "/system/bin/sdcard";
+ 
++static const char* EMULATED_PRIVATE_VOLUME_INTERNAL_PATH = "/data/media_private";
++static const char* EMULATED_PRIVATE_VOLUME_ID_LABEL = "emulated_private";
++#define PROP_ENABLE_PRIVATE_FOLDER "ro.sys.enable_private_folder"
++
+ EmulatedVolume::EmulatedVolume(const std::string& rawPath) :
+         VolumeBase(Type::kEmulated), mFusePid(0) {
+-    setId("emulated");
+     mRawPath = rawPath;
+-    mLabel = "emulated";
+-    LOG(DEBUG) << "EmulatedVolume(" << getId() << ") is newed";
++    if (strstr(rawPath.c_str(), EMULATED_PRIVATE_VOLUME_INTERNAL_PATH)) {
++        setId(EMULATED_PRIVATE_VOLUME_ID_LABEL);
++        mLabel = EMULATED_PRIVATE_VOLUME_ID_LABEL;
++        setType(Type::kEmulatedPrivate);
++        LOG(DEBUG) << "EmulatedPrivateVolume(" << getId() << ") is newed";
++    } else {
++        setId("emulated");
++    	mLabel = "emulated";
++    	LOG(DEBUG) << "EmulatedVolume(" << getId() << ") is newed";
++    }
+ }
+ 
+ EmulatedVolume::EmulatedVolume(const std::string& rawPath, dev_t device,
+         const std::string& fsUuid) : VolumeBase(Type::kEmulated), mFusePid(0) {
+-    setId(StringPrintf("emulated:%u,%u", major(device), minor(device)));
+-    mRawPath = rawPath;
+-    mLabel = fsUuid;
+-    LOG(DEBUG) << "EmulatedVolume(" << getId() << ") is newed";
++    if (!strstr(rawPath.c_str(), EMULATED_PRIVATE_VOLUME_INTERNAL_PATH)) {
++	    setId(StringPrintf("emulated:%u,%u", major(device), minor(device)));
++	    mRawPath = rawPath;
++	    mLabel = fsUuid;
++	    LOG(DEBUG) << "EmulatedVolume(" << getId() << ") is newed";
++
++    }
+ }
+ 
+ EmulatedVolume::~EmulatedVolume() {
+@@ -59,7 +74,7 @@
+     // We could have migrated storage to an adopted private volume, so always
+     // call primary storage "emulated" to avoid media rescans.
+     std::string label = mLabel;
+-    if (getMountFlags() & MountFlags::kPrimary) {
++    if ((getType() == Type::kEmulated) && (getMountFlags() & MountFlags::kPrimary)) {
+         label = "emulated";
+     }
+ 
+@@ -70,6 +85,11 @@
+     setInternalPath(mRawPath);
+     setPath(StringPrintf("/storage/%s", label.c_str()));
+ 
++    if (!property_get_bool(PROP_ENABLE_PRIVATE_FOLDER, false) &&
++            strcmp(label.c_str(), EMULATED_PRIVATE_VOLUME_ID_LABEL) == 0) {
++        LOG(DEBUG) << "doMount: don't mount " << EMULATED_PRIVATE_VOLUME_ID_LABEL;
++        return OK;
++    }
+     if (fs_prepare_dir(mFuseDefault.c_str(), 0700, AID_ROOT, AID_ROOT) ||
+             fs_prepare_dir(mFuseRead.c_str(), 0700, AID_ROOT, AID_ROOT) ||
+             fs_prepare_dir(mFuseWrite.c_str(), 0700, AID_ROOT, AID_ROOT)) {
+@@ -100,8 +120,8 @@
+         return -errno;
+     }
+ 
+-    while (before == GetDevice(mFuseWrite)) {
+-        LOG(VERBOSE) << "Waiting for FUSE to spin up...";
++    while (0 != GetDevice(mRawPath) && before == GetDevice(mFuseWrite)) {
++        LOG(VERBOSE) << getId() << ", Waiting for FUSE to spin up...";
+         usleep(50000); // 50ms
+     }
+ 
+diff --git a/VolumeBase.cpp b/VolumeBase.cpp
+index 50d8f41..eee8837 100644
+--- a/VolumeBase.cpp
++++ b/VolumeBase.cpp
+@@ -130,6 +130,16 @@
+     return OK;
+ }
+ 
++status_t VolumeBase::setType(const Type& type) {
++    if (mCreated) {
++        LOG(WARNING) << getId() << " type change requires not created";
++        return -EBUSY;
++    }
++
++    mType = type;
++    return OK;
++}
++
+ void VolumeBase::notifyEvent(int event) {
+     if (mSilent) return;
+     VolumeManager::Instance()->getBroadcaster()->sendBroadcast(event,
+diff --git a/VolumeBase.h b/VolumeBase.h
+index c408d88..2a2409c 100644
+--- a/VolumeBase.h
++++ b/VolumeBase.h
+@@ -53,6 +53,7 @@
+         kEmulated,
+         kAsec,
+         kObb,
++        kEmulatedPrivate
+     };
+ 
+     enum MountFlags {
+@@ -113,6 +114,7 @@
+     status_t setId(const std::string& id);
+     status_t setPath(const std::string& path);
+     status_t setInternalPath(const std::string& internalPath);
++    status_t setType(const Type& type);
+ 
+     void notifyEvent(int msg);
+     void notifyEvent(int msg, const std::string& value);
+diff --git a/VolumeManager.cpp b/VolumeManager.cpp
+index 7985da4..37c9dbf 100644
+--- a/VolumeManager.cpp
++++ b/VolumeManager.cpp
+@@ -321,6 +321,11 @@
+             new android::vold::EmulatedVolume("/data/media"));
+     mInternalEmulated->create();
+ 
++    CHECK(mInternalEmulatedPrivate == nullptr);
++    mInternalEmulatedPrivate = std::shared_ptr<android::vold::VolumeBase>(
++            new android::vold::EmulatedVolume("/data/media_private"));
++    mInternalEmulatedPrivate->create();
++
+     // Consider creating a virtual disk
+     updateVirtualDisk();
+ 
+@@ -331,6 +336,10 @@
+     CHECK(mInternalEmulated != nullptr);
+     mInternalEmulated->destroy();
+     mInternalEmulated = nullptr;
++
++    CHECK(mInternalEmulatedPrivate!= nullptr);
++    mInternalEmulatedPrivate->destroy();
++    mInternalEmulatedPrivate= nullptr;
+     return 0;
+ }
+ 
+@@ -434,6 +443,9 @@
+ std::shared_ptr<android::vold::VolumeBase> VolumeManager::findVolume(const std::string& id) {
+     if (mInternalEmulated->getId() == id) {
+         return mInternalEmulated;
++    }
++    if (mInternalEmulatedPrivate->getId() == id) {
++        return mInternalEmulatedPrivate;
+     }
+     for (const auto& disk : mDisks) {
+         auto vol = disk->findVolume(id);
+@@ -698,6 +710,8 @@
+     // newly connected framework hears all events.
+     mInternalEmulated->destroy();
+     mInternalEmulated->create();
++	mInternalEmulatedPrivate->destroy();
++	mInternalEmulatedPrivate->create();
+     for (const auto& disk : mDisks) {
+         disk->destroy();
+         disk->create();
+@@ -714,7 +728,14 @@
+         return 0; // already shutdown
+     }
+     mInternalEmulated->destroy();
+-    mInternalEmulated = nullptr;
++	mInternalEmulated = nullptr;
++	
++    if (mInternalEmulatedPrivate == nullptr) {
++        return 0; // already shutdown
++    }
++    mInternalEmulatedPrivate->destroy();
++	mInternalEmulatedPrivate = nullptr;	
++	
+     for (const auto& disk : mDisks) {
+         disk->destroy();
+     }
+@@ -729,6 +750,11 @@
+     if (mInternalEmulated != nullptr) {
+         mInternalEmulated->unmount();
+     }
++
++    if (mInternalEmulatedPrivate != nullptr) {
++        mInternalEmulatedPrivate->unmount();
++    }
++	
+     for (const auto& disk : mDisks) {
+         disk->unmountAll();
+     }
+diff --git a/VolumeManager.h b/VolumeManager.h
+index 4840143..b8954da 100644
+--- a/VolumeManager.h
++++ b/VolumeManager.h
+@@ -215,6 +215,7 @@
+     std::string mVirtualDiskPath;
+     std::shared_ptr<android::vold::Disk> mVirtualDisk;
+     std::shared_ptr<android::vold::VolumeBase> mInternalEmulated;
++    std::shared_ptr<android::vold::VolumeBase> mInternalEmulatedPrivate;
+     std::shared_ptr<android::vold::VolumeBase> mPrimary;
+ 
+ public:

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context="ting.privatefolderdemo.MainActivity"
+    android:padding="10dp">
+    <TextView
+        android:id="@+id/id_text_private_folder_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/str_text_root"
+        android:layout_marginBottom="30dp"/>
+
+    <!--          -->
+    <!--  root    -->
+    <!--          -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/str_text_create_delete_root_title"
+        android:layout_marginBottom="5dp"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="right"
+        android:layout_marginBottom="5dp">
+        <Button
+            android:id="@+id/id_btn_root_create"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/str_btn_create_file"
+            tools:layout_editor_absoluteX="176dp"
+            tools:layout_editor_absoluteY="217dp"/>
+        <Button
+            android:id="@+id/id_btn_root_delete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/str_btn_delete_file"
+            tools:layout_editor_absoluteX="158dp"
+            tools:layout_editor_absoluteY="49dp"/>
+    </LinearLayout>
+    <TextView
+        android:id="@+id/id_text_root_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/str_text_create_delete_root_message"
+        android:layout_marginBottom="30dp"/>
+
+    <!--          -->
+    <!--sub-folder-->
+    <!--          -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/str_text_create_delete_subfoler_title"
+        android:layout_marginBottom="5dp"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="right"
+        android:layout_marginBottom="5dp">
+        <Button
+            android:id="@+id/id_btn_subfolder_create"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/str_btn_create_file"
+            tools:layout_editor_absoluteX="282dp"
+            tools:layout_editor_absoluteY="217dp"/>
+        <Button
+            android:id="@+id/id_btn_subfolder_delete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/str_btn_delete_file"
+            tools:layout_editor_absoluteX="272dp"
+            tools:layout_editor_absoluteY="49dp"/>
+    </LinearLayout>
+    <TextView
+        android:id="@+id/id_text_subfolder_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/str_text_create_delete_subfoler_message"/>
+</LinearLayout>

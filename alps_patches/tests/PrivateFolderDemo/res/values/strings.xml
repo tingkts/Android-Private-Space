@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">PrivateFolderDemo</string>
+
+    <string name="str_btn_create_file">create file</string>
+    <string name="str_btn_delete_file">delete file</string>
+
+    <string name="str_text_root">private folder root: %s</string>
+    <string name="str_text_create_delete_root_title">Create file in the root</string>
+    <string name="str_text_create_delete_root_message">message...</string>
+    <string name="str_text_create_delete_subfoler_title">Create file in the sub folder</string>
+    <string name="str_text_create_delete_subfoler_message">message...</string>
+</resources>

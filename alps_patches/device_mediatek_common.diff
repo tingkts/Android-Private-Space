@@ -1,0 +1,24 @@
+From 8c28e2b62fa2fcb598899a9ec3ead3f1ec0f0285 Mon Sep 17 00:00:00 2001
+From: Ting.Sung <Ting.Sung@tpv-tech.com>
+Date: Mon, 11 Dec 2017 15:22:28 +0800
+Subject: [PATCH] [Porting] feature of private folder
+
+http://twtps524.tpvaoc.com:1001/#/q/branch:X828_N0_V2+owner:Ting.Sung+message:private+project:MT6755S/alps/device
+
+Change-Id: I616bf5a35630689d4ed06912103851a6f99029d7
+Signed-off-by: Ting.Sung <Ting.Sung@tpv-tech.com>
+---
+
+diff --git a/device.mk b/device.mk
+index d3cd4c5..f92c57b 100644
+--- a/device.mk
++++ b/device.mk
+@@ -2722,6 +2722,8 @@
+ # Add for sdcardfs
+ PRODUCT_PROPERTY_OVERRIDES += ro.sys.sdcardfs=1
+ 
++PRODUCT_PROPERTY_OVERRIDES += ro.sys.enable_private_folder=1
++
+ # Add for CMCC Light Customization Support
+ ifeq ($(strip $(CMCC_LIGHT_CUST_SUPPORT)), yes)
+     PRODUCT_PROPERTY_OVERRIDES += ro.cmcc_light_cust_support=1

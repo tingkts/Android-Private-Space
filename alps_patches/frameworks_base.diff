@@ -1,0 +1,590 @@
+From 33e317ec96423e10032319d231bfc39ca307b088 Mon Sep 17 00:00:00 2001
+From: Ting.Sung <Ting.Sung@tpv-tech.com>
+Date: Tue, 23 Aug 2016 15:10:49 +0800
+Subject: [PATCH] [Porting] feature of private folder
+
+http://twtps524.tpvaoc.com:1001/#/q/branch:X828_N0_V2+owner:self+message:private+project:MT6755S/alps/frameworks/base
+
+Change-Id: I57df98725c086eb4ca21ed05c27916ec7dd0d767
+Signed-off-by: Ting.Sung <Ting.Sung@tpv-tech.com>
+---
+
+diff --git a/core/java/android/app/ContextImpl.java b/core/java/android/app/ContextImpl.java
+index 4ff6581..2288000 100644
+--- a/core/java/android/app/ContextImpl.java
++++ b/core/java/android/app/ContextImpl.java
+@@ -200,6 +200,8 @@
+     private File mCacheDir;
+     @GuardedBy("mSync")
+     private File mCodeCacheDir;
++    @GuardedBy("mSync")
++    private File mPrivateFilesDir;
+ 
+     // The system service cache for the system services that are cached per-ContextImpl.
+     final Object[] mServiceCache = SystemServiceRegistry.createServiceCache();
+@@ -2524,4 +2526,18 @@
+             return ContentProvider.getUserIdFromAuthority(auth, mUser.getIdentifier());
+         }
+     }
++
++    /** @hide */
++    @Override
++    public File getPrivateFilesDir() {
++        synchronized (mSync) {
++            if (mPrivateFilesDir == null) {
++                mPrivateFilesDir = Environment.buildPrivateStorageAppFilesDir(this, getPackageName());
++            }
++            if (!mPrivateFilesDir.getAbsolutePath().contains("emulated_private")) return null;
++            File [] dir = {mPrivateFilesDir};
++            // Create dirs if needed
++            return ensureExternalDirsExistOrFilter(dir)[0];
++        }
++    }
+ }
+diff --git a/core/java/android/content/Context.java b/core/java/android/content/Context.java
+index 96c4bf2..36483b1 100644
+--- a/core/java/android/content/Context.java
++++ b/core/java/android/content/Context.java
+@@ -1418,6 +1418,9 @@
+      */
+     public abstract File[] getExternalMediaDirs();
+ 
++    /** @hide */
++    public abstract File getPrivateFilesDir();
++
+     /**
+      * Returns an array of strings naming the private files associated with
+      * this Context's application package.
+@@ -4705,6 +4708,7 @@
+      * @see #createCredentialProtectedStorageContext()
+      * @hide
+      */
++
+     @SystemApi
+     public abstract boolean isCredentialProtectedStorage();
+ 
+diff --git a/core/java/android/content/ContextWrapper.java b/core/java/android/content/ContextWrapper.java
+index df59f0e..b595493 100644
+--- a/core/java/android/content/ContextWrapper.java
++++ b/core/java/android/content/ContextWrapper.java
+@@ -288,6 +288,12 @@
+         return mBase.getPreloadsFileCache();
+     }
+ 
++    /** @hide */
++    @Override
++    public File getPrivateFilesDir() {
++        return mBase.getPrivateFilesDir();
++    }
++
+     @Override
+     public SQLiteDatabase openOrCreateDatabase(String name, int mode, CursorFactory factory) {
+         return mBase.openOrCreateDatabase(name, mode, factory);
+diff --git a/core/java/android/os/Environment.java b/core/java/android/os/Environment.java
+index 5b0e5bb..30d6a68 100644
+--- a/core/java/android/os/Environment.java
++++ b/core/java/android/os/Environment.java
+@@ -25,6 +25,8 @@
+ 
+ import java.io.File;
+ 
++import android.os.storage.VolumeInfo;
++
+ /**
+  * Provides access to environment variables.
+  */
+@@ -93,6 +95,12 @@
+             return files;
+         }
+ 
++        public File getPrivateDir(Context context) {
++            VolumeInfo privateVolume = StorageManager.from(context).findVolumeById("emulated_private");
++            if (privateVolume == null) return null;
++            return privateVolume.getPathForUser(mUserId);
++        }
++
+         @Deprecated
+         public File getExternalStorageDirectory() {
+             return getExternalDirs()[0];
+@@ -133,6 +141,10 @@
+ 
+         public File[] buildExternalStorageAppCacheDirs(String packageName) {
+             return buildPaths(getExternalDirs(), DIR_ANDROID, DIR_DATA, packageName, DIR_CACHE);
++        }
++
++        public File buildPrivateStorageAppFilesDir(Context context, String packageName) {
++            return buildPath(getPrivateDir(context), DIR_ANDROID, DIR_DATA, packageName);
+         }
+     }
+ 
+@@ -970,4 +982,10 @@
+     public static File maybeTranslateEmulatedPathToInternal(File path) {
+         return StorageManager.maybeTranslateEmulatedPathToInternal(path);
+     }
++
++    /** @hide */
++    public static File buildPrivateStorageAppFilesDir(Context context, String packageName) {
++        throwIfUserRequired();
++        return sCurrentUser.buildPrivateStorageAppFilesDir(context, packageName);
++    }
+ }
+diff --git a/core/java/android/os/storage/VolumeInfo.java b/core/java/android/os/storage/VolumeInfo.java
+index 5c5cc59..d012a4e 100644
+--- a/core/java/android/os/storage/VolumeInfo.java
++++ b/core/java/android/os/storage/VolumeInfo.java
+@@ -84,6 +84,7 @@
+     public static final int TYPE_EMULATED = 2;
+     public static final int TYPE_ASEC = 3;
+     public static final int TYPE_OBB = 4;
++    public static final int TYPE_EMULATED_PRIVATE = 5;
+ 
+     public static final int STATE_UNMOUNTED = 0;
+     public static final int STATE_CHECKING = 1;
+@@ -314,7 +315,7 @@
+             return null;
+         } else if (type == TYPE_PUBLIC) {
+             return new File(path);
+-        } else if (type == TYPE_EMULATED) {
++        } else if (type == TYPE_EMULATED || type == TYPE_EMULATED_PRIVATE) {
+             return new File(path, Integer.toString(userId));
+         } else {
+             return null;
+diff --git a/services/core/java/com/android/server/StorageManagerService.java b/services/core/java/com/android/server/StorageManagerService.java
+index 98bcb9b..32bd2fa 100644
+--- a/services/core/java/com/android/server/StorageManagerService.java
++++ b/services/core/java/com/android/server/StorageManagerService.java
+@@ -1440,7 +1440,8 @@
+             vol.mountUserId = mCurrentUserId;
+             mHandler.obtainMessage(H_VOLUME_MOUNT, vol).sendToTarget();
+ 
+-        } else if (vol.type == VolumeInfo.TYPE_PRIVATE) {
++        } else if (vol.type == VolumeInfo.TYPE_PRIVATE ||
++                vol.type == VolumeInfo.TYPE_EMULATED_PRIVATE) {
+             mHandler.obtainMessage(H_VOLUME_MOUNT, vol).sendToTarget();
+ 
+         } else {
+@@ -3453,7 +3454,8 @@
+         // belong to the calling package.
+         if (FileUtils.contains(userEnv.buildExternalStorageAppDataDirs(callingPkg), appFile) ||
+                 FileUtils.contains(userEnv.buildExternalStorageAppObbDirs(callingPkg), appFile) ||
+-                FileUtils.contains(userEnv.buildExternalStorageAppMediaDirs(callingPkg), appFile)) {
++                FileUtils.contains(userEnv.buildExternalStorageAppMediaDirs(callingPkg), appFile) ||
++                FileUtils.contains(userEnv.buildPrivateStorageAppFilesDir(mContext, callingPkg), appFile)) {
+             appPath = appFile.getAbsolutePath();
+             if (!appPath.endsWith("/")) {
+                 appPath = appPath + "/";
+diff --git a/test-runner/src/android/test/mock/MockContext.java b/test-runner/src/android/test/mock/MockContext.java
+index 24e7bff..5fb226d 100644
+--- a/test-runner/src/android/test/mock/MockContext.java
++++ b/test-runner/src/android/test/mock/MockContext.java
+@@ -784,6 +784,12 @@
+     @Override
+     public File getPreloadsFileCache() { throw new UnsupportedOperationException(); }
+ 
++    /** @hide **/
++    @Override
++    public File getPrivateFilesDir() {
++        throw new UnsupportedOperationException();
++    }
++
+     @Override
+     public Context createDeviceProtectedStorageContext() {
+         throw new UnsupportedOperationException();
+diff --git a/tests/PrivateFolderDemo/Android.mk b/tests/PrivateFolderDemo/Android.mk
+new file mode 100755
+index 0000000..4ed5758
+--- /dev/null
++++ b/tests/PrivateFolderDemo/Android.mk
+@@ -0,0 +1,8 @@
++LOCAL_PATH:= $(call my-dir)
++include $(CLEAR_VARS)
++LOCAL_PACKAGE_NAME := PrivateFolderDemo
++#LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES := $(call all-java-files-under, java)
++LOCAL_RESOURCE_DIR = $(LOCAL_PATH)/res
++#LOCAL_AAPT_FLAGS := --auto-add-overlay
++include $(BUILD_PACKAGE)
+\ No newline at end of file
+diff --git a/tests/PrivateFolderDemo/AndroidManifest.xml b/tests/PrivateFolderDemo/AndroidManifest.xml
+new file mode 100755
+index 0000000..6e7a04f
+--- /dev/null
++++ b/tests/PrivateFolderDemo/AndroidManifest.xml
+@@ -0,0 +1,19 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.tpv.privatefolderdemo">
++    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
++    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
++    <application
++        android:allowBackup="true"
++        android:icon="@mipmap/ic_launcher"
++        android:label="@string/app_name"
++        android:supportsRtl="true"
++        android:theme="@style/AppTheme">
++        <activity android:name=".MainActivity">
++            <intent-filter>
++                <action android:name="android.intent.action.MAIN" />
++                <category android:name="android.intent.category.LAUNCHER" />
++            </intent-filter>
++        </activity>
++    </application>
++</manifest>
+diff --git a/tests/PrivateFolderDemo/java/com/tpv/privatefolderdemo/MainActivity.java b/tests/PrivateFolderDemo/java/com/tpv/privatefolderdemo/MainActivity.java
+new file mode 100755
+index 0000000..d69cdb5
+--- /dev/null
++++ b/tests/PrivateFolderDemo/java/com/tpv/privatefolderdemo/MainActivity.java
+@@ -0,0 +1,131 @@
++package com.tpv.privatefolderdemo;
++
++import android.app.Activity;
++import android.os.Bundle;
++import android.util.Log;
++import android.view.View;
++import android.widget.Button;
++import android.widget.TextView;
++import java.io.File;
++import java.io.FileOutputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++//import com.tpv.privatefolderdemo.R;
++
++public class MainActivity extends Activity {
++    TextView textRootPath;
++
++    class UiItemGroup {
++        Button btnCreate;
++        Button btnDelete;
++        TextView textMessage;
++    }
++
++    UiItemGroup uiFileInRoot;
++    UiItemGroup uiFileInSubFolder;
++
++    File PRIVATE_ROOT;
++
++    @Override
++    protected void onCreate(Bundle savedInstanceState) {
++        super.onCreate(savedInstanceState);
++        PRIVATE_ROOT = getPrivateFilesDir();
++        setContentView(R.layout.activity_main);
++        textRootPath = (TextView)findViewById(R.id.id_text_private_folder_root);
++        textRootPath.setText(PRIVATE_ROOT.toString());
++
++        uiFileInRoot = new UiItemGroup();
++        uiFileInRoot.btnCreate = (Button)findViewById(R.id.id_btn_root_create);
++        uiFileInRoot.btnDelete = (Button)findViewById(R.id.id_btn_root_delete);
++        uiFileInRoot.textMessage = (TextView)findViewById(R.id.id_text_root_message);
++        uiFileInRoot.btnCreate.setOnClickListener(
++            new View.OnClickListener() {
++                public void onClick(View v) {
++                    fileOperation(FilePath.ROOT, FileAction.CREATE);
++                }
++            }
++        );
++        uiFileInRoot.btnDelete.setOnClickListener(
++                new View.OnClickListener() {
++                public void onClick(View v) {
++                    fileOperation(FilePath.ROOT, FileAction.DELETE);
++                }
++            }
++        );
++        uiFileInRoot.btnDelete.setEnabled(false);
++
++        uiFileInSubFolder = new UiItemGroup();
++        uiFileInSubFolder.btnCreate = (Button)findViewById(R.id.id_btn_subfolder_create);
++        uiFileInSubFolder.btnDelete = (Button)findViewById(R.id.id_btn_subfolder_delete);
++        uiFileInSubFolder.textMessage = (TextView)findViewById(R.id.id_text_subfolder_message);
++        uiFileInSubFolder.btnCreate.setOnClickListener(
++            new View.OnClickListener() {
++                public void onClick(View v) {
++                    fileOperation(FilePath.SUB_FOLDER, FileAction.CREATE);
++                }
++            }
++        );
++        uiFileInSubFolder.btnDelete.setOnClickListener(
++            new View.OnClickListener() {
++                public void onClick(View v) {
++                    fileOperation(FilePath.SUB_FOLDER, FileAction.DELETE);
++                }
++            }
++        );
++        uiFileInSubFolder.btnDelete.setEnabled(false);
++    }
++
++    private enum FilePath {
++        ROOT,
++        SUB_FOLDER
++    }
++
++    private enum FileAction {
++        CREATE,
++        DELETE
++    }
++
++    void fileOperation(FilePath filePath, FileAction fileAction) {
++        try {
++            UiItemGroup uiItemGroup = null;
++            File file = null;
++            if (filePath == FilePath.ROOT) {
++                uiItemGroup = uiFileInRoot;
++                file = new File(PRIVATE_ROOT, "DemoFile.jpg");
++            }
++            else if (filePath == FilePath.SUB_FOLDER) {
++                uiItemGroup = uiFileInSubFolder;
++                new File(PRIVATE_ROOT.getPath()+"/subFolder").mkdir();
++                file = new File(PRIVATE_ROOT.getPath()+"/subFolder", "DemoFile.jpg");
++            }
++            if (fileAction == FileAction.CREATE) {
++                InputStream is = getResources().openRawResource(R.drawable.balloons);
++                OutputStream os = new FileOutputStream(file);
++                byte[] data = new byte[is.available()];
++                is.read(data);
++                os.write(data);
++                is.close();
++                os.close();
++                if (file.exists()) {
++                    uiItemGroup.textMessage.setText(file + " created.");
++                    uiItemGroup.btnCreate.setEnabled(false);
++                    uiItemGroup.btnDelete.setEnabled(true);
++                }
++            } else if (fileAction == FileAction.DELETE) {
++                file.delete();
++                if (!file.exists()) {
++                    uiItemGroup.textMessage.setText(file + " deleted.");
++                    uiItemGroup.btnCreate.setEnabled(true);
++                    uiItemGroup.btnDelete.setEnabled(false);
++                }
++            }
++        } catch (SecurityException e) {
++            Log.e(getClass().getName(), "", e);
++        } catch (IOException e) {
++            Log.e(getClass().getName(), "", e);
++        } catch (Exception e) {
++            Log.e(getClass().getName(), "", e);
++        }
++    }
++}
+\ No newline at end of file
+diff --git a/tests/PrivateFolderDemo/res/drawable/balloons.jpg b/tests/PrivateFolderDemo/res/drawable/balloons.jpg
+new file mode 100644
+index 0000000..6a90b92
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/drawable/balloons.jpg
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/layout/activity_main.xml b/tests/PrivateFolderDemo/res/layout/activity_main.xml
+new file mode 100644
+index 0000000..e30f21f
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/layout/activity_main.xml
+@@ -0,0 +1,87 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:tools="http://schemas.android.com/tools"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:orientation="vertical"
++    tools:context="ting.privatefolderdemo.MainActivity"
++    android:padding="10dp">
++    <TextView
++        android:id="@+id/id_text_private_folder_root"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="@string/str_text_root"
++        android:layout_marginBottom="30dp"/>
++
++    <!--          -->
++    <!--  root    -->
++    <!--          -->
++    <TextView
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="@string/str_text_create_delete_root_title"
++        android:layout_marginBottom="5dp"/>
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:gravity="right"
++        android:layout_marginBottom="5dp">
++        <Button
++            android:id="@+id/id_btn_root_create"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/str_btn_create_file"
++            tools:layout_editor_absoluteX="176dp"
++            tools:layout_editor_absoluteY="217dp"/>
++        <Button
++            android:id="@+id/id_btn_root_delete"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/str_btn_delete_file"
++            tools:layout_editor_absoluteX="158dp"
++            tools:layout_editor_absoluteY="49dp"/>
++    </LinearLayout>
++    <TextView
++        android:id="@+id/id_text_root_message"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="@string/str_text_create_delete_root_message"
++        android:layout_marginBottom="30dp"/>
++
++    <!--          -->
++    <!--sub-folder-->
++    <!--          -->
++    <TextView
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="@string/str_text_create_delete_subfoler_title"
++        android:layout_marginBottom="5dp"/>
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="horizontal"
++        android:gravity="right"
++        android:layout_marginBottom="5dp">
++        <Button
++            android:id="@+id/id_btn_subfolder_create"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/str_btn_create_file"
++            tools:layout_editor_absoluteX="282dp"
++            tools:layout_editor_absoluteY="217dp"/>
++        <Button
++            android:id="@+id/id_btn_subfolder_delete"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="@string/str_btn_delete_file"
++            tools:layout_editor_absoluteX="272dp"
++            tools:layout_editor_absoluteY="49dp"/>
++    </LinearLayout>
++    <TextView
++        android:id="@+id/id_text_subfolder_message"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="@string/str_text_create_delete_subfoler_message"/>
++</LinearLayout>
+\ No newline at end of file
+diff --git a/tests/PrivateFolderDemo/res/mipmap-hdpi/ic_launcher.png b/tests/PrivateFolderDemo/res/mipmap-hdpi/ic_launcher.png
+new file mode 100755
+index 0000000..cde69bc
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-hdpi/ic_launcher.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-hdpi/ic_launcher_round.png b/tests/PrivateFolderDemo/res/mipmap-hdpi/ic_launcher_round.png
+new file mode 100755
+index 0000000..9a078e3
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-hdpi/ic_launcher_round.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-mdpi/ic_launcher.png b/tests/PrivateFolderDemo/res/mipmap-mdpi/ic_launcher.png
+new file mode 100755
+index 0000000..c133a0c
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-mdpi/ic_launcher.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-mdpi/ic_launcher_round.png b/tests/PrivateFolderDemo/res/mipmap-mdpi/ic_launcher_round.png
+new file mode 100755
+index 0000000..efc028a
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-mdpi/ic_launcher_round.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-xhdpi/ic_launcher.png b/tests/PrivateFolderDemo/res/mipmap-xhdpi/ic_launcher.png
+new file mode 100755
+index 0000000..bfa42f0
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-xhdpi/ic_launcher.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-xhdpi/ic_launcher_round.png b/tests/PrivateFolderDemo/res/mipmap-xhdpi/ic_launcher_round.png
+new file mode 100755
+index 0000000..3af2608
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-xhdpi/ic_launcher_round.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-xxhdpi/ic_launcher.png b/tests/PrivateFolderDemo/res/mipmap-xxhdpi/ic_launcher.png
+new file mode 100755
+index 0000000..324e72c
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-xxhdpi/ic_launcher.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-xxhdpi/ic_launcher_round.png b/tests/PrivateFolderDemo/res/mipmap-xxhdpi/ic_launcher_round.png
+new file mode 100755
+index 0000000..9bec2e6
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-xxhdpi/ic_launcher_round.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-xxxhdpi/ic_launcher.png b/tests/PrivateFolderDemo/res/mipmap-xxxhdpi/ic_launcher.png
+new file mode 100755
+index 0000000..aee44e1
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-xxxhdpi/ic_launcher.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/mipmap-xxxhdpi/ic_launcher_round.png b/tests/PrivateFolderDemo/res/mipmap-xxxhdpi/ic_launcher_round.png
+new file mode 100755
+index 0000000..34947cd
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/mipmap-xxxhdpi/ic_launcher_round.png
+Binary files differ
+diff --git a/tests/PrivateFolderDemo/res/values/colors.xml b/tests/PrivateFolderDemo/res/values/colors.xml
+new file mode 100755
+index 0000000..3ab3e9c
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/values/colors.xml
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <color name="colorPrimary">#3F51B5</color>
++    <color name="colorPrimaryDark">#303F9F</color>
++    <color name="colorAccent">#FF4081</color>
++</resources>
+diff --git a/tests/PrivateFolderDemo/res/values/strings.xml b/tests/PrivateFolderDemo/res/values/strings.xml
+new file mode 100755
+index 0000000..185c16a
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/values/strings.xml
+@@ -0,0 +1,12 @@
++<resources>
++    <string name="app_name">PrivateFolderDemo</string>
++
++    <string name="str_btn_create_file">create file</string>
++    <string name="str_btn_delete_file">delete file</string>
++
++    <string name="str_text_root">private folder root: %s</string>
++    <string name="str_text_create_delete_root_title">Create file in the root</string>
++    <string name="str_text_create_delete_root_message">message...</string>
++    <string name="str_text_create_delete_subfoler_title">Create file in the sub folder</string>
++    <string name="str_text_create_delete_subfoler_message">message...</string>
++</resources>
+\ No newline at end of file
+diff --git a/tests/PrivateFolderDemo/res/values/styles.xml b/tests/PrivateFolderDemo/res/values/styles.xml
+new file mode 100755
+index 0000000..5656577
+--- /dev/null
++++ b/tests/PrivateFolderDemo/res/values/styles.xml
+@@ -0,0 +1,5 @@
++<resources>
++    <style name="AppTheme" parent="android:Theme.Holo.Light.DarkActionBar">
++        <!-- Customize your theme here. -->
++    </style>
++</resources>
+diff --git a/tools/layoutlib/bridge/src/com/android/layoutlib/bridge/android/BridgeContext.java b/tools/layoutlib/bridge/src/com/android/layoutlib/bridge/android/BridgeContext.java
+index 1fc5d72..6bc53b2 100644
+--- a/tools/layoutlib/bridge/src/com/android/layoutlib/bridge/android/BridgeContext.java
++++ b/tools/layoutlib/bridge/src/com/android/layoutlib/bridge/android/BridgeContext.java
+@@ -1968,6 +1968,13 @@
+         return new File[0];
+     }
+ 
++    /** @hide */
++    @Override
++    public File getPrivateFilesDir() {
++        // pass
++        return null;
++    }
++
+     public void setScrollYPos(@NonNull View view, int scrollPos) {
+         mScrollYPos.put(view, scrollPos);
+     }
