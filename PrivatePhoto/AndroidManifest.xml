@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.ting.privatephoto"
+    android:versionCode="2"
+    android:versionName="2.0"
+    android:sharedUserId="com.videoplayer"> <!-- use in-house video player to play private video, and so need shared uid with each other -->
+    <uses-sdk android:minSdkVersion="14" android:targetSdkVersion="23"/>
+    <supports-screens android:requiresSmallestWidthDp="320"
+            android:compatibleWidthLimitDp="480"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE"/>
+    <application
+            android:name=".app.PrivatePhotoApp"
+            android:label="@string/app_name"
+            android:supportsRtl="true"
+            android:icon="@drawable/app_icon"
+            android:hardwareAccelerated="true"
+            android:theme="@style/GalleryTheme">
+        <activity
+            android:name=".app.PrivateAlbumListActivity"
+            android:screenOrientation="portrait"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"/>
+        <activity
+            android:name=".app.PublicAlbumListActivity"
+            android:screenOrientation="portrait"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"/>
+        <activity
+            android:name=".app.PrivatePhotoGridActivity"
+            android:screenOrientation="portrait"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"/>
+        <activity
+            android:name=".app.PublicPhotoGridActivity"
+            android:screenOrientation="portrait"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"/>
+        <activity
+            android:name=".app.PrivatePhotoPaperActivity"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:configChanges="keyboardHidden|orientation|screenSize"/>
+        <activity
+            android:name=".app.PublicPhotoPaperActivity"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:configChanges="keyboardHidden|orientation|screenSize"/>
+        <provider
+            android:name=".database.PrivateItemProvider"
+            android:authorities="com.ting.privatephoto.database.PrivateItemProvider"
+            android:exported="true"
+            android:multiprocess="false"/>
+    </application>
+</manifest>

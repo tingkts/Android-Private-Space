@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+    <!-- paper -->
+    <android.support.v4.view.ViewPager
+        android:id="@+id/id_photo_pager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+    <!-- top bar -->
+    <LinearLayout
+        android:id="@+id/id_topbar_title_root"
+        android:layout_width="match_parent"
+        android:layout_height="49dp"
+        android:orientation="horizontal"
+        android:background="@color/top_bar_background">
+        <ImageView
+            android:id="@+id/id_topbar_title_back_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="20dp"
+            android:src="@drawable/gallery_back_01"
+            android:layout_gravity="center_vertical"/>
+        <TextView
+            android:id="@+id/id_topbar_title"
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1.0"
+            android:gravity="center_vertical"
+            android:textColor="@android:color/white"
+            android:textSize="18dp"/>
+    </LinearLayout>
+    <!-- bottom bar -->
+        <!-- add to private -->
+    <LinearLayout
+        android:id="@+id/id_bottom_bar_add2private_root"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom"
+        android:background="@color/bottom_bar_background"
+        android:visibility="invisible">
+        <TextView
+            android:id="@+id/id_bottom_bar_add2private"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="10dp"
+            android:drawableTop="@drawable/bottom_ctrl_add_icon_selector"
+            android:drawablePadding="0dp"
+            android:gravity="center_horizontal|center_vertical"
+            android:text="@string/bottom_bar_add2private"
+            android:textColor="@android:color/white"
+            android:textSize="10dp"
+            />
+    </LinearLayout>
+        <!-- private item action: delete, move, restore -->
+    <RelativeLayout android:id="@+id/id_bottom_bar_item_actions_root"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:background="#4f4f4f"
+        android:orientation="horizontal"
+        android:padding="0dp"
+        android:scaleType="center"
+        android:visibility="invisible"
+        android:layout_gravity="bottom">
+        <LinearLayout
+            android:id="@+id/id_bottom_bar_item_actions_root2"
+            style="@android:style/ButtonBar"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:layout_alignParentBottom="true"
+            android:background="#00000000"
+            android:layout_marginTop="5dp"
+            android:gravity="center_vertical">
+            <TextView
+                android:id="@+id/id_bottom_bar_item_actions_del"
+                android:layout_width="0.0dip"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:text="@string/bottom_bar_delete"
+                android:textSize="10dp"
+                android:drawableTop="@drawable/bottom_bar_del_selector"
+                android:drawablePadding="3dp"
+                android:gravity="center_horizontal"
+                android:textColor="#ffffff" />
+            <TextView
+                android:id="@+id/id_bottom_bar_item_actions_move"
+                android:layout_width="0.0dip"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:drawableTop="@drawable/bottom_bar_move_selector"
+                android:drawablePadding="3dp"
+                android:gravity="center_horizontal"
+                android:text="@string/bottom_bar_move"
+                android:textColor="#ffffff"
+                android:textSize="10dp"
+                android:visibility="gone"/>
+            <TextView
+                android:id="@+id/id_bottom_bar_item_actions_restore"
+                android:layout_width="0.0dip"
+                android:layout_height="match_parent"
+                android:layout_weight="1.0"
+                android:text="@string/bottom_bar_restore"
+                android:textSize="10dp"
+                android:drawableTop="@drawable/bottom_bar_restore_selector"
+                android:drawablePadding="3dp"
+                android:gravity="center_horizontal"
+                android:textColor="#ffffff" />
+        </LinearLayout>
+    </RelativeLayout>
+    <!-- progress bar : cycle progress -->
+    <ProgressBar android:id="@+id/id_progress_cycle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:indeterminateTint="@color/top_bar_background"
+        android:visibility="gone"/>
+</FrameLayout>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="top_bar_background">#0288D1</color>
+    <color name="listview_divider">#e0e0e0</color>
+    <color name="listview_item_rightarrow_tint">#8a000000</color>
+    <color name="listview_item_album_count">#797D81</color>
+    <color name="imageview_border">#838680</color>
+    <color name="grid_press_mask">#55444444</color>
+    <color name="bottom_bar_background">#4f4f4f</color>
+</resources>

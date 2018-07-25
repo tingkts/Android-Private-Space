@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:orientation="vertical">
+        <!-- top bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="49dp"
+            android:orientation="horizontal"
+            android:background="@color/top_bar_background">
+            <ImageView
+                android:id="@+id/id_topbar_title_back_icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginLeft="16dp"
+                android:layout_marginRight="20dp"
+                android:src="@drawable/gallery_back_01"
+                android:scaleType="center"
+                android:layout_gravity="center_vertical"/>
+            <TextView
+                android:id="@+id/id_topbar_title"
+                android:layout_width="0dp"
+                android:layout_height="fill_parent"
+                android:layout_weight="1.0"
+                android:gravity="center_vertical"
+                android:textColor="@android:color/white"
+                android:textSize="18dp"/>
+        </LinearLayout>
+            <!-- top bar bottom adornment line -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:src="@drawable/title_bar_bottom_adornment_line"
+            android:scaleType="fitCenter"/>
+        <!-- list view : album list -->
+        <ListView
+            android:id="@+id/id_listview_album"
+            android:layout_height="0dp"
+            android:layout_width="match_parent"
+            android:layout_weight="1.0"
+            android:divider="@color/listview_divider"
+            android:dividerHeight="1dp"
+            android:footerDividersEnabled="true"
+            android:background="@android:color/white">
+        </ListView>
+    </LinearLayout>
+    <!-- progress bar : cycle progress -->
+    <ProgressBar android:id="@+id/id_progress_cycle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:indeterminateTint="@color/top_bar_background"
+        android:visibility="invisible"/>
+</FrameLayout>

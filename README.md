@@ -1,1 +1,1 @@
-# android_app_private_photo_demo
+The demo app of Android private photo feature.

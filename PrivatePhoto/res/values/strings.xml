@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="app_name">Private Photo</string>
+    <string name="album_list_item_newalbum">New Album</string>
+    <string name="top_bar_title_private_album_list">Private Album</string>
+    <string name="top_bar_title_public_album_list">Add Photo</string>
+    <string name="top_bar_cancel">Cancel</string>
+    <string name="top_bar_select_all">Select all</string>
+    <string name="top_bar_select_n">%d Selected</string>
+    <string name="bottom_bar_add2private">Add to private</string>
+    <string name="bottom_bar_delete">Delete</string>
+    <string name="bottom_bar_move">Move</string>
+    <string name="bottom_bar_restore">Restore</string>
+    <string name="confirm_delete">Delete selected item?</string>
+    <string name="ok">OK</string>
+</resources>
