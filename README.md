@@ -1,4 +1,4 @@
-AOSP codebase is base on Android M /N 
+AOSP codebase is base on Android M/N 
 
 - PrivatePhoto:  the demo app of alps framework feature for private photo.
 
